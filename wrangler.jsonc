@@ -1,5 +1,5 @@
 {
-  "name": "notepad-backend",
+  "name": "marktogether-durable-object",
   "main": "index.js",
   "compatibility_date": "2026-02-06",
   "durable_objects": {
