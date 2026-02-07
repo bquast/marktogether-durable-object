@@ -12,7 +12,7 @@
   },
   "migrations": [
     {
-      "tag": "v2", // Increment this if v1 already exists
+      "tag": "v1",
       "new_sqlite_classes": ["NotepadRoom"]
     }
   ]
