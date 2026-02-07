@@ -1,7 +1,7 @@
 {
-  "name": "notepad-backend",
+  "name": "marktogether-durable-object",
   "main": "index.js",
-  "compatibility_date": "2026-02-06",
+  "compatibility_date": "2026-02-07",
   "durable_objects": {
     "bindings": [
       {
@@ -12,8 +12,8 @@
   },
   "migrations": [
     {
-      "tag": "v1",
-      "new_sqlite_classes": ["NotepadRoom"] 
+      "tag": "v2", // Increment this if v1 already exists
+      "new_sqlite_classes": ["NotepadRoom"]
     }
   ]
 }

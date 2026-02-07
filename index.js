@@ -41,13 +41,12 @@ export class NotepadRoom {
   }
 }
 
-// 2. The Global Fetch Handler (This is what triggers the DO)
+// 2. The Global Fetch Handler
 export default {
   async fetch(request, env) {
-    // This looks for a binding named NOTEPAD_ROOM in your wrangler.jsonc
-    const id = env.NOTEPAD_ROOM.idFromName("global-note"); 
+    // Routes every request to the DO instance named "global-note"
+    const id = env.NOTEPAD_ROOM.idFromName("global-note");
     const room = env.NOTEPAD_ROOM.get(id);
-    
     return room.fetch(request);
   }
 };
