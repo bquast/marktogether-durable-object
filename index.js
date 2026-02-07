@@ -1,4 +1,8 @@
-// 1. The Durable Object Class
+/**
+ * FULL index.js
+ * Durable Object with SQLite backend
+ */
+
 export class NotepadRoom {
   constructor(state, env) {
     this.state = state;
@@ -19,20 +23,35 @@ export class NotepadRoom {
     server.accept();
     this.sessions.add(server);
 
-    // FIX: use .first() instead of .one() to avoid crashing on empty tables
-    const row = this.state.storage.sql.exec("SELECT content FROM notes LIMIT 1").first();
-    if (row) server.send(JSON.stringify({ content: row.content }));
+    // FIX: Iterate the cursor to get the first row
+    const cursor = this.state.storage.sql.exec("SELECT content FROM notes LIMIT 1");
+    for (const row of cursor) {
+        server.send(JSON.stringify({ content: row.content }));
+        break; // Only send the first result
+    }
 
     server.addEventListener("message", async (msg) => {
-      const data = JSON.parse(msg.data);
-      this.state.storage.sql.exec(
-        "INSERT INTO notes (id, content) VALUES ('note', ?) ON CONFLICT(id) DO UPDATE SET content = excluded.content",
-        data.content
-      );
+      try {
+        const data = JSON.parse(msg.data);
+        
+        // Persist content
+        this.state.storage.sql.exec(
+          "INSERT INTO notes (id, content) VALUES ('note', ?) ON CONFLICT(id) DO UPDATE SET content = excluded.content",
+          data.content
+        );
 
-      // Broadcast to all other sessions
-      for (let s of this.sessions) {
-        if (s !== server) s.send(msg.data);
+        // Broadcast to all other sessions
+        for (let s of this.sessions) {
+          if (s !== server) {
+            try {
+              s.send(msg.data);
+            } catch (e) {
+              this.sessions.delete(s);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Message handling error:", err);
       }
     });
 
@@ -41,7 +60,6 @@ export class NotepadRoom {
   }
 }
 
-// 2. The Global Fetch Handler
 export default {
   async fetch(request, env) {
     const id = env.NOTEPAD_ROOM.idFromName("global-note");
