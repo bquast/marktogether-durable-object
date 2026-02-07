@@ -3,7 +3,7 @@ export class NotepadRoom {
   constructor(state, env) {
     this.state = state;
     this.sessions = new Set();
-    
+
     // Initialize SQLite storage
     this.state.blockConcurrencyWhile(async () => {
       await this.state.storage.sql.exec(`
@@ -19,8 +19,8 @@ export class NotepadRoom {
     server.accept();
     this.sessions.add(server);
 
-    // Load initial state
-    const row = this.state.storage.sql.exec("SELECT content FROM notes LIMIT 1").one();
+    // FIX: use .first() instead of .one() to avoid crashing on empty tables
+    const row = this.state.storage.sql.exec("SELECT content FROM notes LIMIT 1").first();
     if (row) server.send(JSON.stringify({ content: row.content }));
 
     server.addEventListener("message", async (msg) => {
@@ -41,13 +41,11 @@ export class NotepadRoom {
   }
 }
 
-// 2. The Global Fetch Handler (This is what triggers the DO)
+// 2. The Global Fetch Handler
 export default {
   async fetch(request, env) {
-    // This looks for a binding named NOTEPAD_ROOM in your wrangler.jsonc
-    const id = env.NOTEPAD_ROOM.idFromName("global-note"); 
+    const id = env.NOTEPAD_ROOM.idFromName("global-note");
     const room = env.NOTEPAD_ROOM.get(id);
-    
     return room.fetch(request);
   }
 };
