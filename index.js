@@ -1,13 +1,12 @@
 /**
- * FINAL index.js
- * Durable Object with SQLite storage + Presence
+ * FULL index.js (Worker)
  */
 const ANIMALS = ["Puffy Panda", "Grumpy Gopher", "Sly Snake", "Happy Hippo", "Daring Duck", "Lazy Lion"];
 
 export class NotepadRoom {
   constructor(state, env) {
     this.state = state;
-    this.sessions = new Map(); // Track socket -> { name, cursor }
+    this.sessions = new Map(); // Map socket -> { name, cursor }
 
     this.state.blockConcurrencyWhile(async () => {
       await this.state.storage.sql.exec(`
@@ -17,14 +16,15 @@ export class NotepadRoom {
   }
 
   async fetch(request) {
-    const [client, server] = Object.values(new WebSocketPair());
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
     server.accept();
 
-    // Assign a random animal name
+    // Assign a random animal name to this specific socket
     const name = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
     this.sessions.set(server, { name, cursor: 0 });
 
-    // Send initial state
+    // Send current note content and assigned name to the new user
     const cursor = this.state.storage.sql.exec("SELECT content FROM notes LIMIT 1");
     for (const row of cursor) {
       server.send(JSON.stringify({ type: 'init', content: row.content, name }));
@@ -42,19 +42,26 @@ export class NotepadRoom {
       }
 
       if (data.type === 'cursor') {
-        this.sessions.get(server).cursor = data.pos;
+        const session = this.sessions.get(server);
+        if (session) session.cursor = data.pos;
       }
 
-      // Broadcast update/presence to everyone else
+      // Broadcast update and the full list of active users to everyone
       const presence = Array.from(this.sessions.values());
       for (let [socket, info] of this.sessions) {
-        if (socket !== server) {
-          socket.send(JSON.stringify({ ...data, presence }));
-        }
+        socket.send(JSON.stringify({ ...data, presence }));
       }
     });
 
-    server.addEventListener("close", () => this.sessions.delete(server));
+    server.addEventListener("close", () => {
+      this.sessions.delete(server);
+      // Broadcast updated presence list after someone leaves
+      const presence = Array.from(this.sessions.values());
+      for (let [socket, info] of this.sessions) {
+        socket.send(JSON.stringify({ type: 'presence', presence }));
+      }
+    });
+
     return new Response(null, { status: 101, webSocket: client });
   }
 }
@@ -62,6 +69,7 @@ export class NotepadRoom {
 export default {
   async fetch(request, env) {
     const id = env.NOTEPAD_ROOM.idFromName("global-note");
-    return env.NOTEPAD_ROOM.get(id).fetch(request);
+    const room = env.NOTEPAD_ROOM.get(id);
+    return room.fetch(request);
   }
 };
